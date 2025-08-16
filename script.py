@@ -121,53 +121,85 @@ def registrar_ponto():
             #    *** SEÇÃO “LOCALIZADORES” ***
             # Tente primeiro por texto direto no botão/menu:
             # === INÍCIO DO BLOCO AJUSTADO ===
+            # === INÍCIO DO BLOCO AJUSTADO ===
             sucesso = False
             candidatos = ["Registrar Ponto", "Registrar ponto"]
 
-            # 1) aguarda o iframe do pontomobile e entra nele
-            page.wait_for_selector('iframe[src*="hcm-pontomobile"]', timeout=60000)
-            frame = page.frame_locator('iframe[src*="hcm-pontomobile"]').first
+            # 1) garanta que a tela terminou de montar (SPA)
+            page.wait_for_load_state("networkidle", timeout=60000)
+            page.wait_for_timeout(1500)  # pequeno respiro
 
-            # 2) tenta por id com prefixo (id é dinâmico, então usamos ^=)
+            # 2) debug: liste todos os frames/iframes disponíveis (aparece no Job Summary)
             try:
-                btn = frame.locator('button[id^="btn-clocking-event-"]').first
-                btn.wait_for(state="visible", timeout=10000)
-                btn.click(timeout=10000)
-                sucesso = True
-                log.append("Clique no botão (id^='btn-clocking-event-') efetuado.")
+                frames_info = [f"- {i}: {fr.url}" for i, fr in enumerate(page.frames)]
+                write_summary("#### Frames detectados:\n" + "\n".join(frames_info))
             except Exception:
                 pass
 
-            # 3) fallback por role + texto exato
-            if not sucesso:
-                for label in candidatos:
-                    try:
-                        frame.get_by_role("button", name=label).click(timeout=6000)
-                        sucesso = True
-                        log.append(f"Clique no botão por role/name: '{label}'.")
-                        break
-                    except Exception:
-                        continue
+            # 3) encontre o frame alvo por URL (pontomobile / clocking / hcm)
+            alvos = ("pontomobile", "clocking-event", "hcm-pontomobile", "hcm")
+            frame_alvo = None
 
-            # 4) fallback por CSS com :has-text (texto parcial)
-            if not sucesso:
+            # tente por até ~20s (às vezes o microfrontend aparece atrasado)
+            for _ in range(20):
+                for fr in page.frames:
+                    u = (fr.url or "").lower()
+                    if any(k in u for k in alvos):
+                        frame_alvo = fr
+                        break
+                if frame_alvo:
+                    break
+                page.wait_for_timeout(1000)
+
+            if not frame_alvo:
+                # fallback: tente achar qualquer iframe e usar o primeiro para inspecionar
                 try:
-                    frame.locator('button.resize-clocking-event-button:has-text("Registrar Ponto")').first.click(timeout=6000)
-                    sucesso = True
-                    log.append("Clique no botão por CSS :has-text('Registrar Ponto').")
+                    page.wait_for_selector("iframe", timeout=10000)
+                    # atualiza a lista e tenta de novo
+                    for fr in page.frames:
+                        u = (fr.url or "").lower()
+                        if any(k in u for k in alvos):
+                            frame_alvo = fr
+                            break
                 except Exception:
                     pass
 
-            # 5) último fallback: qualquer <button> que contenha o texto
+            if not frame_alvo:
+                raise RuntimeError(
+                    "Não localizei o iframe do módulo de ponto. "
+                    "Veja 'Frames detectados' no Summary para o(s) URL(s) encontrado(s) e me envie."
+                )
+
+            log.append(f"Iframe alvo encontrado: {frame_alvo.url}")
+
+            # 4) tente clicar no botão dentro do frame
+            #   Tentativa A: id dinâmico por prefixo
+            try:
+                frame_alvo.locator('button[id^="btn-clocking-event-"]').first.click(timeout=10000)
+                sucesso = True
+                log.append("Clique no botão (id^=btn-clocking-event-) efetuado.")
+            except Exception:
+                pass
+
+            #   Tentativa B: role + texto
             if not sucesso:
                 for label in candidatos:
                     try:
-                        frame.locator(f'button:has-text("{label}")').first.click(timeout=6000)
+                        frame_alvo.get_by_role("button", name=label).click(timeout=8000)
                         sucesso = True
-                        log.append(f"Clique no botão por fallback 'button:has-text(\"{label}\")'.")
+                        log.append(f"Clique por role/name: '{label}'.")
                         break
                     except Exception:
                         continue
+
+            #   Tentativa C: CSS com :has-text
+            if not sucesso:
+                try:
+                    frame_alvo.locator('button:has-text("Registrar Ponto")').first.click(timeout=8000)
+                    sucesso = True
+                    log.append("Clique por CSS :has-text('Registrar Ponto').")
+                except Exception:
+                    pass
 
             if not sucesso:
                 raise RuntimeError("Não encontrei o botão/ação de 'Registrar ponto'. Ajuste os seletores.")

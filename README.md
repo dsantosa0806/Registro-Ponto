@@ -17,9 +17,10 @@ Assim, você não precisa marcar manualmente — o script faz login, acessa a te
 ## 📂 Estrutura do projeto
 ```
 .
-├── script.py      # Script principal em Python
+├── script.py                        # Script principal em Python
 ├── .github\workflows\ponto.yml      # Workflow do GitHub Actions
-└── README.md      # Documentação do projeto
+└── README.md                        # Documentação do projeto
+└── requirements.txt                 # Arquivo obrigatório dos requisitos 
 ```
 
 ---

@@ -58,3 +58,4 @@ jobs:
           name: evidencias-ponto
           path: ponto.png
           if-no-files-found: ignore
+          retention-days: 30

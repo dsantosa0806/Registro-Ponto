@@ -18,7 +18,7 @@ Assim, você não precisa marcar manualmente — o script faz login, acessa a te
 ```
 .
 ├── script.py      # Script principal em Python
-├── ponto.yml      # Workflow do GitHub Actions
+├── .github\workflows\ponto.yml      # Workflow do GitHub Actions
 └── README.md      # Documentação do projeto
 ```
 

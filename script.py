@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from datetime import datetime
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
@@ -39,6 +40,16 @@ def registrar_ponto():
         )
         context = browser.new_context(timezone_id="America/Sao_Paulo", locale="pt-BR")
         context.set_default_timeout(120000)
+
+        # (opcional) bloquear ruído que mantém rede ocupada
+        bloquear = ["google-analytics", "gtm", "segment", "hotjar", "doubleclick", "facebook", "sentry"]
+        def _route(route):
+            url = route.request.url.lower()
+            if any(b in url for b in bloquear):
+                return route.abort()
+            return route.continue_()
+        context.route("**/*", _route)
+
         page = context.new_page()
         page.set_default_timeout(120000)
 
@@ -87,20 +98,16 @@ def registrar_ponto():
             if not clicou:
                 page.locator("button").first.click(timeout=3000)
 
-            import time
-            # Aguarda pós-login de forma robusta: URL OU iframe OU nova aba
+            # Pós-login robusto: checa todas as abas e o iframe, sem 'networkidle'
             encontrou = False
             inicio = time.time()
-
-            while time.time() - inicio < 60:  # tenta por até 60s
-                # 1) Alguma aba já está no Senior-X?
+            while time.time() - inicio < 60:
                 for pg in context.pages:
                     u = (pg.url or "").lower()
                     if "senior-x" in u:
-                        page = pg  # muda o "page" atual para a aba correta
+                        page = pg
                         encontrou = True
                         break
-                    # 2) Já existe o iframe esperado?
                     try:
                         if pg.locator("#custom_iframe").count():
                             page = pg
@@ -112,22 +119,34 @@ def registrar_ponto():
                     break
                 page.wait_for_timeout(1000)
 
-            # Se não encontrou, força a navegação pro Senior-X (alguns fluxos não redirecionam sozinhos)
             if not encontrou:
+                # força a navegação para o Senior-X
                 try:
                     page.goto("https://platform.senior.com.br/senior-x/#/", wait_until="domcontentloaded", timeout=60000)
-                    page.wait_for_load_state("networkidle", timeout=60000)
                     encontrou = True
                 except Exception:
                     pass
 
-            # Validação final: precisa estar no Senior-X ou ver o iframe
-            if not (("senior-x" in (page.url or "").lower()) or page.locator("#custom_iframe").count()):
+            # Validação final sem networkidle
+            ok = False
+            for _ in range(30):
+                if "senior-x" in (page.url or "").lower():
+                    ok = True
+                    break
+                try:
+                    if page.locator("#custom_iframe").count():
+                        ok = True
+                        break
+                except Exception:
+                    pass
+                page.wait_for_timeout(1000)
+
+            if not ok:
                 raise RuntimeError("Login feito, mas o Senior-X não abriu. Verifique credenciais/SSO ou bloqueios pós-login.")
 
             log.append(f"Login ok. URL atual: {page.url}")
 
-            # 2) Abrir a tela de ponto (microfrontend em iframe)
+            # 2) Abrir a tela de ponto (sem esperar 'networkidle')
             url_ponto = (
                 "https://platform.senior.com.br/senior-x/#/Gest%C3%A3o%20de%20Pessoas%20%7C%20HCM/1/"
                 "res:%2F%2Fsenior.com.br%2Fhcm%2Fpontomobile%2FclockingEvent?category=frame&"
@@ -135,29 +154,21 @@ def registrar_ponto():
                 "withCredentials=true&r=0"
             )
             page.goto(url_ponto, wait_until="domcontentloaded", timeout=120000)
-            page.wait_for_load_state("networkidle", timeout=120000)
-            log.append("Tela de registro de ponto requisitada.")
+            log.append("Tela de registro de ponto requisitada (sem esperar networkidle).")
 
-            # 3) Descobrir o iframe do pontomobile (varrendo todos os frames)
-            alvos = ("pontomobile", "clocking-event", "hcm")
-            frame_alvo = None
-
-            # tente por ~30s (aparece atrasado em alguns tenants)
-            for tentativa in range(30):
-                frames_info = [f"- {i}: {fr.url}" for i, fr in enumerate(page.frames)]
-                write_summary("#### Frames detectados (tentativa %d):\n%s" % (tentativa + 1, "\n".join(frames_info)))
-
-                for fr in page.frames:
-                    u = (fr.url or "").lower()
-                    if any(k in u for k in alvos):
-                        frame_alvo = fr
+            # Aguarda o iframe #custom_iframe por polling (até ~90s)
+            frame_ok = False
+            for _ in range(90):
+                try:
+                    if page.locator("#custom_iframe").count():
+                        frame_ok = True
                         break
-                if frame_alvo:
-                    break
+                except Exception:
+                    pass
                 page.wait_for_timeout(1000)
 
-            if not frame_alvo:
-                # Evidências para debug
+            if not frame_ok:
+                # Evidências e falha
                 try:
                     with open("ponto.html", "w", encoding="utf-8") as f:
                         f.write(page.content())
@@ -167,31 +178,23 @@ def registrar_ponto():
                     page.screenshot(path="ponto.png", full_page=True)
                 except Exception:
                     pass
-                raise RuntimeError(
-                    "Não localizei o iframe do módulo de ponto. "
-                    "Veja 'Frames detectados' no Summary e os artifacts (ponto.html / ponto.png)."
-                )
+                raise RuntimeError("Iframe #custom_iframe não apareceu após abrir a tela de ponto.")
 
-            log.append(f"Iframe alvo encontrado: {frame_alvo.url}")
-
-            # 4) Clicar no botão "Registrar Ponto" (id dinâmico + textos)
-            # === INÍCIO DO BLOCO AJUSTADO ===
+            # 3) Clicar no botão dentro do iframe
             sucesso = False
             candidatos = ["Registrar Ponto", "Registrar ponto"]
 
-            # 1) aguarde o iframe e entre nele pelo ID fixo
-            page.wait_for_selector("#custom_iframe", timeout=120000)
             frame = page.frame_locator("#custom_iframe")
 
-            # 2) tente clicar pelo CSS + texto (classe do botão que você mostrou)
+            # A) CSS por classe + texto
             try:
                 frame.locator('button.resize-clocking-event-button:has-text("Registrar Ponto")').first.click(timeout=10000)
                 sucesso = True
-                log.append("Clique no botão por CSS (.resize-clocking-event-button + 'Registrar Ponto').")
+                log.append("Clique no botão (.resize-clocking-event-button:has-text('Registrar Ponto')).")
             except Exception:
                 pass
 
-            # 3) fallback: por role + texto
+            # B) Role + texto
             if not sucesso:
                 for label in candidatos:
                     try:
@@ -202,7 +205,7 @@ def registrar_ponto():
                     except Exception:
                         continue
 
-            # 4) fallback: por id dinâmico com prefixo (se existir)
+            # C) id dinâmico (prefixo)
             if not sucesso:
                 try:
                     frame.locator('button[id^="btn-clocking-event-"]').first.click(timeout=8000)
@@ -212,12 +215,21 @@ def registrar_ponto():
                     pass
 
             if not sucesso:
+                # Evidências extras
+                try:
+                    with open("ponto.html", "w", encoding="utf-8") as f:
+                        f.write(page.content())
+                except Exception:
+                    pass
+                try:
+                    page.screenshot(path="ponto.png", full_page=True)
+                except Exception:
+                    pass
                 raise RuntimeError("Não encontrei o botão/ação de 'Registrar ponto'. Ajuste os seletores.")
 
             log.append("Clique para registrar ponto efetuado. Validando sucesso…")
-            # === FIM DO BLOCO AJUSTADO ===
 
-            # 5) Verificação de sucesso (toast/texto; se não aparecer, não invalida)
+            # 4) Verificação de sucesso (toast/texto dentro do iframe)
             validou = False
             for msg in [
                 "Ponto registrado com sucesso",
@@ -227,7 +239,7 @@ def registrar_ponto():
                 "Operação realizada com sucesso",
             ]:
                 try:
-                    frame.get_by_text(msg, exact=False).first.wait_for(timeout=8000)
+                    frame.get_by_text(re.compile(msg, re.I)).first.wait_for(timeout=8000)
                     validou = True
                     break
                 except PWTimeout:
@@ -240,7 +252,7 @@ def registrar_ponto():
             return "\n".join(log)
 
         finally:
-            # Evidência final (mesmo em sucesso)
+            # Evidências finais
             try:
                 page.screenshot(path="ponto.png", full_page=True)
             except Exception:

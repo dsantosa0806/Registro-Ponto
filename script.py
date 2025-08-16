@@ -120,36 +120,60 @@ def registrar_ponto():
             # 4) Abrir/acionar o registro de ponto
             #    *** SEÇÃO “LOCALIZADORES” ***
             # Tente primeiro por texto direto no botão/menu:
+            # === INÍCIO DO BLOCO AJUSTADO ===
             sucesso = False
-            candidatos = [
-                "Registrar Ponto",
-                "Registrar ponto"
-                
-            ]
+            candidatos = ["Registrar Ponto", "Registrar ponto"]
 
-            for label in candidatos:
-                try:
-                    page.locator('button[id^="btn-clocking-event-"]').first.click(timeout=3000)
-                    sucesso = True
-                    break
-                except PWTimeout:
-                    try:
-                        page.get_by_text(label, exact=False).click(timeout=3000)
-                        sucesso = True
-                        break
-                    except PWTimeout:
-                        pass
+            # 1) aguarda o iframe do pontomobile e entra nele
+            page.wait_for_selector('iframe[src*="hcm-pontomobile"]', timeout=60000)
+            frame = page.frame_locator('iframe[src*="hcm-pontomobile"]').first
 
-            if not sucesso:
-                # Se houver um data-testid conhecido, coloque aqui (exemplo):
-                # page.locator('[data-testid="btn-registrar-ponto"]').click(timeout=5000)
-                # sucesso = True
+            # 2) tenta por id com prefixo (id é dinâmico, então usamos ^=)
+            try:
+                btn = frame.locator('button[id^="btn-clocking-event-"]').first
+                btn.wait_for(state="visible", timeout=10000)
+                btn.click(timeout=10000)
+                sucesso = True
+                log.append("Clique no botão (id^='btn-clocking-event-') efetuado.")
+            except Exception:
                 pass
+
+            # 3) fallback por role + texto exato
+            if not sucesso:
+                for label in candidatos:
+                    try:
+                        frame.get_by_role("button", name=label).click(timeout=6000)
+                        sucesso = True
+                        log.append(f"Clique no botão por role/name: '{label}'.")
+                        break
+                    except Exception:
+                        continue
+
+            # 4) fallback por CSS com :has-text (texto parcial)
+            if not sucesso:
+                try:
+                    frame.locator('button.resize-clocking-event-button:has-text("Registrar Ponto")').first.click(timeout=6000)
+                    sucesso = True
+                    log.append("Clique no botão por CSS :has-text('Registrar Ponto').")
+                except Exception:
+                    pass
+
+            # 5) último fallback: qualquer <button> que contenha o texto
+            if not sucesso:
+                for label in candidatos:
+                    try:
+                        frame.locator(f'button:has-text("{label}")').first.click(timeout=6000)
+                        sucesso = True
+                        log.append(f"Clique no botão por fallback 'button:has-text(\"{label}\")'.")
+                        break
+                    except Exception:
+                        continue
 
             if not sucesso:
                 raise RuntimeError("Não encontrei o botão/ação de 'Registrar ponto'. Ajuste os seletores.")
 
             log.append("Clique para registrar ponto efetuado. Validando sucesso…")
+            # === FIM DO BLOCO AJUSTADO ===
 
             # 5) Verificação de sucesso
             # Tente detectar um toast/mensagem/estado após bater o ponto:

@@ -1,20 +1,10 @@
 import os
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.utils import formataddr
 from datetime import datetime
-import playwright
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
 SENIOR_USER = os.environ.get("SENIOR_USER")
 SENIOR_PASSWORD = os.environ.get("SENIOR_PASSWORD")
 SENIOR_URL = "https://platform.senior.com.br/login/?redirectTo=https%3A%2F%2Fplatform.senior.com.br%2Fsenior-x%2F&tenant=g4f.com.br"
-
-
-# topo do arquivo
-import os
-from datetime import datetime
 
 def write_summary(md: str):
     path = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -22,17 +12,10 @@ def write_summary(md: str):
         with open(path, "a", encoding="utf-8") as f:
             f.write(md + "\n")
 
-# ... dentro do fluxo Playwright, depois de registrar o ponto com sucesso:
-write_summary(f"### ✅ Ponto registrado\n- Horário: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
-
-# ... em caso de erro (no except):
-write_summary(f"### ❌ Falha ao registrar o ponto\n- Erro: `{e}`\n")
-raise  # mantém o job como 'failed'
-
 def registrar_ponto():
     log = []
     ts = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    log.append(f"[{ts}] Início do processo (TZ={TZ}).")
+    log.append(f"[{ts}] Início do processo.")
 
     if not (SENIOR_USER and SENIOR_PASSWORD):
         raise RuntimeError("Variáveis de ambiente SENIOR_USER e SENIOR_PASSWORD não configuradas.")
@@ -206,14 +189,10 @@ def registrar_ponto():
 if __name__ == "__main__":
     try:
         body = registrar_ponto()
-        subject = "✅ Ponto registrado (GitHub Actions)"
-        print("OK: e-mail enviado.")
+        write_summary(f"### ✅ Ponto registrado\n- Horário: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+        print("OK: Ponto registrado com sucesso.")
     except Exception as e:
         erro = f"❌ Falha ao registrar ponto: {e}"
         print(erro)
-        try:
-            send_email("❌ Erro ao registrar ponto (GitHub Actions)", erro)
-        except Exception as e2:
-            print(f"Falha ao enviar e-mail de erro: {e2}")
-        # Sinaliza erro para o runner (útil para logs/alertas do Actions)
+        write_summary(f"### ❌ Falha ao registrar o ponto\n- Erro: `{e}`\n")
         raise

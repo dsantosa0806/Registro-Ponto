@@ -2,9 +2,15 @@ name: Registro de ponto
 
 on:
   schedule:
-    # 08:05 America/Sao_Paulo ≈ 11:05 UTC
-    - cron: "5 11 * * *"
-  workflow_dispatch:
+    # 06:00 BRT -> 09:00 UTC, seg a sex
+    - cron: "0 9 * * 1-5"
+    # 10:00 BRT -> 13:00 UTC, seg a sex
+    - cron: "0 13 * * 1-5"
+    # 10:15 BRT -> 13:15 UTC, seg a sex
+    - cron: "15 13 * * 1-5"
+    # 12:15 BRT -> 15:15 UTC, seg a sex
+    - cron: "15 15 * * 1-5"
+  workflow_dispatch:  # permite rodar agora, manualmente
 
 concurrency:
   group: ponto-schedule
@@ -15,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TZ: America/Sao_Paulo
-
       SENIOR_USER: ${{ secrets.SENIOR_USER }}
       SENIOR_PASSWORD: ${{ secrets.SENIOR_PASSWORD }}
 
@@ -37,10 +42,15 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
 
+      - name: Sanity check secrets
+        run: |
+          [ -n "$SENIOR_USER" ] || { echo "::error::SENIOR_USER não definido"; exit 1; }
+          [ -n "$SENIOR_PASSWORD" ] || { echo "::error::SENIOR_PASSWORD não definido"; exit 1; }
+
       - name: Run script
         run: python script.py
 
-      # Opcional: anexa 'ponto.png' se você tirar screenshot no script
+      # Opcional: se seu script gerar 'ponto.png' (screenshot), anexa como evidência
       - name: Upload evidências
         if: always()
         uses: actions/upload-artifact@v4

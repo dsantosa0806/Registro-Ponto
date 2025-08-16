@@ -29,8 +29,11 @@ def registrar_ponto():
         except Exception as e:
             raise RuntimeError(f"Falha ao instalar o navegador Chromium do Playwright: {e}")
             
-        browser = p.chromium.launch(headless=False, args=["--no-sandbox"])
-        context = browser.new_context()
+        browser = p.chromium.launch(headless=True,
+                                    args=["--no-sandbox",
+                                     "--disable-dev-shm-usage"]
+                                )
+        context = browser.new_context(timezone_id="America/Sao_Paulo", locale="pt-BR")
         page = context.new_page()
 
         try:

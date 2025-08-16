@@ -237,6 +237,7 @@ def registrar_ponto():
                 "Marcação realizada",
                 "Seu ponto foi registrado",
                 "Operação realizada com sucesso",
+                "Marcação realizada com sucesso"
             ]:
                 try:
                     frame.get_by_text(re.compile(msg, re.I)).first.wait_for(timeout=8000)
@@ -262,6 +263,8 @@ def registrar_ponto():
                     f.write(page.content())
             except Exception:
                 pass
+
+            log.append("Arquivo de evidência gerado com sucesso!")
             context.close()
             browser.close()
 

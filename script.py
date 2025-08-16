@@ -19,6 +19,23 @@ MAIL_TO = os.environ.get("MAIL_TO")            # destinatário
 MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USER)  # remetente
 TZ = os.environ.get("TZ", "America/Sao_Paulo")
 
+# topo do arquivo
+import os
+from datetime import datetime
+
+def write_summary(md: str):
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(md + "\n")
+
+# ... dentro do fluxo Playwright, depois de registrar o ponto com sucesso:
+write_summary(f"### ✅ Ponto registrado\n- Horário: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+
+# ... em caso de erro (no except):
+write_summary(f"### ❌ Falha ao registrar o ponto\n- Erro: `{e}`\n")
+raise  # mantém o job como 'failed'
+
 def send_email(subject: str, body: str):
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject

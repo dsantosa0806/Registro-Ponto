@@ -87,9 +87,44 @@ def registrar_ponto():
             if not clicou:
                 page.locator("button").first.click(timeout=3000)
 
-            # Aguardar SPA / Senior X
-            page.wait_for_url(lambda u: "senior-x" in (u or ""), timeout=120000)
-            page.wait_for_load_state("networkidle", timeout=120000)
+            import time
+            # Aguarda pós-login de forma robusta: URL OU iframe OU nova aba
+            encontrou = False
+            inicio = time.time()
+
+            while time.time() - inicio < 60:  # tenta por até 60s
+                # 1) Alguma aba já está no Senior-X?
+                for pg in context.pages:
+                    u = (pg.url or "").lower()
+                    if "senior-x" in u:
+                        page = pg  # muda o "page" atual para a aba correta
+                        encontrou = True
+                        break
+                    # 2) Já existe o iframe esperado?
+                    try:
+                        if pg.locator("#custom_iframe").count():
+                            page = pg
+                            encontrou = True
+                            break
+                    except Exception:
+                        pass
+                if encontrou:
+                    break
+                page.wait_for_timeout(1000)
+
+            # Se não encontrou, força a navegação pro Senior-X (alguns fluxos não redirecionam sozinhos)
+            if not encontrou:
+                try:
+                    page.goto("https://platform.senior.com.br/senior-x/#/", wait_until="domcontentloaded", timeout=60000)
+                    page.wait_for_load_state("networkidle", timeout=60000)
+                    encontrou = True
+                except Exception:
+                    pass
+
+            # Validação final: precisa estar no Senior-X ou ver o iframe
+            if not (("senior-x" in (page.url or "").lower()) or page.locator("#custom_iframe").count()):
+                raise RuntimeError("Login feito, mas o Senior-X não abriu. Verifique credenciais/SSO ou bloqueios pós-login.")
+
             log.append(f"Login ok. URL atual: {page.url}")
 
             # 2) Abrir a tela de ponto (microfrontend em iframe)

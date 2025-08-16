@@ -123,16 +123,13 @@ def registrar_ponto():
             sucesso = False
             candidatos = [
                 "Registrar Ponto",
-                "Bater ponto",
-                "Registro de ponto",
-                "Marcar ponto",
-                "Registrar Ponto",
-                "Ponto"
+                "Registrar ponto"
+                
             ]
 
             for label in candidatos:
                 try:
-                    page.get_by_role("button", name=label).click(timeout=3000)
+                    page.locator("#btn-clocking-event-202410231016").click(timeout=3000)
                     sucesso = True
                     break
                 except PWTimeout:

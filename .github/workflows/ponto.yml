@@ -1,0 +1,50 @@
+name: Registro de ponto
+
+on:
+  schedule:
+    # 08:05 America/Sao_Paulo ≈ 11:05 UTC
+    - cron: "5 11 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: ponto-schedule
+  cancel-in-progress: true
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      TZ: America/Sao_Paulo
+
+      SENIOR_USER: ${{ secrets.SENIOR_USER }}
+      SENIOR_PASSWORD: ${{ secrets.SENIOR_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run script
+        run: python script.py
+
+      # Opcional: anexa 'ponto.png' se você tirar screenshot no script
+      - name: Upload evidências
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-ponto
+          path: ponto.png
+          if-no-files-found: ignore

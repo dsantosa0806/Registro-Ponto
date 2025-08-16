@@ -7,30 +7,27 @@ from datetime import datetime
 import playwright
 from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
-SENIOR_USER = "04278152159@g4f.com.br"
-SENIOR_PASSWORD = "04278152159"
+SENIOR_USER = os.environ.get("SENIOR_USER")
+SENIOR_PASSWORD = os.environ.get("SENIOR_PASSWORD")
 SENIOR_URL = "https://platform.senior.com.br/login/?redirectTo=https%3A%2F%2Fplatform.senior.com.br%2Fsenior-x%2F&tenant=g4f.com.br"
 
-SMTP_HOST = os.environ.get("SMTP_HOST")        # ex: "smtp.gmail.com"
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER")
-SMTP_PASSWORD = os.environ.get("SMTP_PASSWORD")
-MAIL_TO = os.environ.get("MAIL_TO")            # destinatário
-MAIL_FROM = os.environ.get("MAIL_FROM", SMTP_USER)  # remetente
-TZ = os.environ.get("TZ", "America/Sao_Paulo")
 
-def send_email(subject: str, body: str):
-    msg = MIMEText(body, "plain", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = formataddr(("Registro de Ponto (bot)", MAIL_FROM))
-    msg["To"] = MAIL_TO
+# topo do arquivo
+import os
+from datetime import datetime
 
-    context = ssl.create_default_context()
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-        server.starttls(context=context)
-        if SMTP_USER and SMTP_PASSWORD:
-            server.login(SMTP_USER, SMTP_PASSWORD)
-        server.send_message(msg)
+def write_summary(md: str):
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(md + "\n")
+
+# ... dentro do fluxo Playwright, depois de registrar o ponto com sucesso:
+write_summary(f"### ✅ Ponto registrado\n- Horário: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n")
+
+# ... em caso de erro (no except):
+write_summary(f"### ❌ Falha ao registrar o ponto\n- Erro: `{e}`\n")
+raise  # mantém o job como 'failed'
 
 def registrar_ponto():
     log = []
@@ -210,7 +207,6 @@ if __name__ == "__main__":
     try:
         body = registrar_ponto()
         subject = "✅ Ponto registrado (GitHub Actions)"
-        send_email(subject, body)
         print("OK: e-mail enviado.")
     except Exception as e:
         erro = f"❌ Falha ao registrar ponto: {e}"

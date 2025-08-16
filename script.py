@@ -129,7 +129,7 @@ def registrar_ponto():
 
             for label in candidatos:
                 try:
-                    page.locator("#btn-clocking-event-202410231016").click(timeout=3000)
+                    page.locator('button[id^="btn-clocking-event-"]').first.click(timeout=3000)
                     sucesso = True
                     break
                 except PWTimeout:

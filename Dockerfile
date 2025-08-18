@@ -1,5 +1,6 @@
 # Usa a imagem oficial Playwright já com navegadores instalados
-FROM mcr.microsoft.com/playwright/python:v1.54.0-focal
+FROM mcr.microsoft.com/playwright/python:v1.54.0
+
 
 # Define diretório de trabalho
 WORKDIR /app

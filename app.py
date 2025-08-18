@@ -1,7 +1,11 @@
 from flask import Flask, jsonify
-import script  # importa seu script.py
+import script  # importa seu script.py (mas não executa o __main__)
 
 app = Flask(__name__)
+
+@app.route("/", methods=["GET"])
+def home():
+    return jsonify({"status": "online", "message": "API do registro de ponto funcionando"}), 200
 
 @app.route("/run", methods=["GET"])
 def run():

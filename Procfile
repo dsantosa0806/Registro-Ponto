@@ -1,1 +1,1 @@
-web: python app.py
+web: playwright install && python app.py

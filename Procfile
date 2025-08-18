@@ -1,1 +1,1 @@
-web: playwright install chromium && python app.py
+web: bash start.sh

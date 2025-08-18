@@ -1,9 +1,9 @@
 # 🤖 Registro Automático de Ponto (Senior X)
 
 Este projeto automatiza o **registro de ponto** no sistema **Senior X** usando **Playwright**.  
-Ele pode ser executado de duas formas:
+Agora ele pode ser executado de duas formas:
 - **Localmente** (`python script.py`)  
-- **Remotamente** como uma **API no Railway**, disparada em horários exatos pelo [cron-job.org](https://cron-job.org)
+- **Remotamente** via **Railway com Docker**, disparado em horários exatos pelo [cron-job.org](https://cron-job.org)  
 
 ---
 
@@ -21,7 +21,8 @@ Ele pode ser executado de duas formas:
 ├── app.py          # API Flask que expõe o script
 ├── script.py       # Script principal em Python
 ├── requirements.txt
-├── Procfile        # Configuração do Railway
+├── Dockerfile      # Configuração de container Playwright + Python
+├── .dockerignore   # Ignora arquivos desnecessários no build
 └── README.md
 ```
 
@@ -29,7 +30,7 @@ Ele pode ser executado de duas formas:
 
 ## 🛠️ Pré-requisitos
 - Python 3.9+ instalado (para execução local)  
-- Conta no [Railway.app](https://railway.app) (para deploy na nuvem)  
+- Conta no [Railway.app](https://railway.app) (para deploy na nuvem com Docker)  
 - Conta no [cron-job.org](https://cron-job.org) (para disparar nos horários certos)  
 - Usuário e senha válidos do **Senior X**  
 
@@ -64,13 +65,17 @@ Isso vai abrir o navegador headless via **Playwright**, logar e registrar o pont
 
 ---
 
-### 2. Hospedar no Railway
-1. Crie um projeto no [Railway](https://railway.app) e conecte este repositório.  
-2. No painel do Railway, adicione as variáveis de ambiente:
+### 2. Hospedar no Railway (via Docker)
+1. O repositório já possui um **Dockerfile** baseado na imagem oficial do Playwright (`mcr.microsoft.com/playwright/python:v1.54.0`).  
+   👉 Essa imagem já vem com Chromium, Firefox e WebKit instalados.  
+2. No Railway:
+   - Crie um novo projeto.  
+   - Escolha **Deploy from GitHub Repo**.  
+   - O Railway detecta o `Dockerfile` automaticamente.  
+3. Configure as variáveis de ambiente no painel do Railway:
    - `SENIOR_USER`
    - `SENIOR_PASSWORD`  
-3. O Railway vai instalar as dependências (`requirements.txt`) e rodar o serviço (`Procfile`).  
-4. Você terá uma URL pública do tipo:
+4. Quando o deploy finalizar, você terá uma URL pública do tipo:
    ```
    https://seuprojeto.up.railway.app
    ```
@@ -109,7 +114,7 @@ Agora o cron-job.org vai disparar o registro de ponto exatamente nos horários q
 ## ✅ Conclusão
 Com este projeto, você automatiza o **registro de ponto** de forma:
 - **Local** → útil para testes  
-- **Remota** → hospedado no Railway, disparado automaticamente pelo cron-job.org  
+- **Remota** → hospedado no Railway via Docker, disparado automaticamente pelo cron-job.org  
 
 Isso garante **praticidade, consistência e execução em ponto**.  
 

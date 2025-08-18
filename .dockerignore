@@ -1,0 +1,32 @@
+# Ignorar cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar virtualenvs locais
+.venv/
+env/
+venv/
+
+# Ignorar logs e arquivos temporários
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Ignorar arquivos do sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar controle de versão
+.git
+.gitignore
+
+# Ignorar configs locais de IDEs
+.vscode/
+.idea/
+
+# Ignorar artifacts de execução local
+ponto.png
+ponto.html

@@ -268,6 +268,7 @@ def registrar_ponto():
             context.close()
             browser.close()
 
+
 if __name__ == "__main__":
     try:
         body = registrar_ponto()
